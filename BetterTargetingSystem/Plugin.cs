@@ -103,7 +103,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private void ShowHelpWindow(string command, string args) => this.DrawHelpUI();
     private void ShowConfigWindow(string command, string args) => this.DrawConfigUI();
 
-    public void ClearLists(ushort territoryType)
+    public void ClearLists(uint territoryType)
     {
         // Attempt to fix a very rare bug I can't reproduce
         this.LastConeTargets = new List<uint>();
@@ -112,7 +112,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
     public void Update(IFramework framework)
     {
-        if (Client.IsLoggedIn == false || Client.LocalPlayer == null)
+        if (Client.IsLoggedIn == false || ObjectTable.LocalPlayer == null)
             return;
 
         // Disable features in PvP
@@ -168,7 +168,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
     private void TargetClosest(bool lowestHealth = false)
     {
-        if (Client.LocalPlayer == null)
+        if (ObjectTable.LocalPlayer == null)
             return;
 
         var (Targets, CloseTargets, EnemyListTargets, OnScreenTargets) = GetTargets();
@@ -180,8 +180,8 @@ public sealed unsafe class Plugin : IDalamudPlugin
         var _targets = OnScreenTargets.Count > 0 ? OnScreenTargets : EnemyListTargets;
 
         var _target = lowestHealth
-            ? _targets.OrderBy(o => (o as DalamudCharacter)?.CurrentHp).ThenBy(o => Utils.DistanceBetweenObjects(Client.LocalPlayer, o)).First()
-            : _targets.OrderBy(o => Utils.DistanceBetweenObjects(Client.LocalPlayer, o)).First();
+            ? _targets.OrderBy(o => (o as DalamudCharacter)?.CurrentHp).ThenBy(o => Utils.DistanceBetweenObjects(ObjectTable.LocalPlayer, o)).First()
+            : _targets.OrderBy(o => Utils.DistanceBetweenObjects(ObjectTable.LocalPlayer, o)).First();
 
         SetTarget(_target);
     }
@@ -194,7 +194,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
     }
     private void TargetBestAOE()
     {
-        if (Client.LocalPlayer == null)
+        if (ObjectTable.LocalPlayer == null)
             return;
 
         var (Targets, CloseTargets, EnemyListTargets, OnScreenTargets) = GetTargets();
@@ -240,7 +240,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
     private void CycleTargets()
     {
-        if (Client.LocalPlayer == null)
+        if (ObjectTable.LocalPlayer == null)
             return;
 
         var (Targets, CloseTargets, EnemyListTargets, OnScreenTargets) = GetTargets();
@@ -256,7 +256,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         // Targets in the frontal cone
         if (Targets.Count > 0)
         {
-            Targets = Targets.OrderBy(o => Utils.DistanceBetweenObjects(Client.LocalPlayer, o)).ToList();
+            Targets = Targets.OrderBy(o => Utils.DistanceBetweenObjects(ObjectTable.LocalPlayer, o)).ToList();
 
             var TargetsObjectIds = Targets.Select(o => o.EntityId);
             // Same cone targets as last cycle
@@ -327,7 +327,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
         if (OnScreenTargets.Count > 0)
         {
-            OnScreenTargets = OnScreenTargets.OrderBy(o => Utils.DistanceBetweenObjects(Client.LocalPlayer, o)).ToList();
+            OnScreenTargets = OnScreenTargets.OrderBy(o => Utils.DistanceBetweenObjects(ObjectTable.LocalPlayer, o)).ToList();
             var _potentialTargetsObjectIds = OnScreenTargets.Select(o => o.EntityId);
 
             if (_potentialTargetsObjectIds.Any(o => this.CyclingTargets.Contains(o) == false))
@@ -355,7 +355,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         var TargetsEnemyList = new List<DalamudGameObject>();
         var OnScreenTargetsList = new List<DalamudGameObject>();
 
-        var Player = Client.LocalPlayer != null ? (GameObject*)Client.LocalPlayer.Address : null;
+        var Player = ObjectTable.LocalPlayer != null ? (GameObject*)ObjectTable.LocalPlayer.Address : null;
         if (Player == null)
             return new ObjectsList(TargetsList, CloseTargetsList, TargetsEnemyList, OnScreenTargetsList);
 
@@ -365,9 +365,9 @@ public sealed unsafe class Plugin : IDalamudPlugin
         float deviceHeight = device->Height;
 
         var PotentialTargets = ObjectTable.Where(
-            o => (ObjectKind.BattleNpc.Equals(o.ObjectKind)
-                || ObjectKind.Player.Equals(o.ObjectKind))
-            && o != Client.LocalPlayer
+            o => (o.ObjectKind == ObjectKind.BattleNpc
+                || o.ObjectKind == ObjectKind.Pc)
+            && o != ObjectTable.LocalPlayer
             && Utils.CanAttack(o)
         );
 
@@ -389,7 +389,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
                 && o->EventId.Id != Player->EventId.Id)
                 continue;
 
-            var distance = Utils.DistanceBetweenObjects(Client.LocalPlayer!, obj);
+            var distance = Utils.DistanceBetweenObjects(ObjectTable.LocalPlayer!, obj);
 
             // This is a bit less than the max distance to target something the vanilla way
             if (distance > 49) continue;
